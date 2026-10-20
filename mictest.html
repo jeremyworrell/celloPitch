@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mic Test">
+<meta name="theme-color" content="#0e0c0b">
+<title>Cello Mic Test</title>
+<style>
+  :root { --bg:#0e0c0b; --fg:#f3ede6; --muted:#b9aea2; --card:#1a1613; --line:#2c2622; --green:#3ecf7f; --amber:#f5b546; --red:#ff6b6b; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); font-family: -apple-system, system-ui, sans-serif; }
+  body { padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 16px); }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  p { color: var(--muted); font-size: 14px; margin: 0 0 16px; line-height: 1.4; }
+  button { width: 100%; height: 56px; border: 0; border-radius: 28px; background: var(--fg); color: var(--bg); font-size: 18px; font-weight: 600; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin-top: 14px; }
+  .note { font-size: 88px; font-weight: 700; line-height: 1; letter-spacing: -0.03em; }
+  .note small { font-size: 34px; color: var(--muted); font-weight: 500; }
+  .cents { font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .row { display: flex; justify-content: space-between; font-size: 14px; color: var(--muted); padding: 4px 0; font-variant-numeric: tabular-nums; }
+  .row b { color: var(--fg); font-weight: 600; }
+  .meter { height: 12px; border-radius: 6px; background: #221d1a; overflow: hidden; margin-top: 8px; }
+  .meter > div { height: 100%; width: 0; background: var(--green); }
+  #log { font: 12px ui-monospace, Menlo, monospace; color: var(--muted); white-space: pre-wrap; }
+</style>
+</head>
+<body>
+  <h1>Cello mic test</h1>
+  <p>Tap Start, allow the microphone, then play long open strings: C, G, D, A. Try it in Safari first, then again from the home screen.</p>
+  <button id="start" type="button">Start</button>
+
+  <div class="card">
+    <div class="note" id="note">–</div>
+    <div class="cents" id="cents">&nbsp;</div>
+    <div class="meter" aria-label="Input level"><div id="level"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="row"><span>Frequency</span><b id="hz">–</b></div>
+    <div class="row"><span>Clarity</span><b id="clarity">–</b></div>
+    <div class="row"><span>Updates per second</span><b id="ups">–</b></div>
+    <div class="row"><span>Analysis time</span><b id="ms">–</b></div>
+    <div class="row"><span>Window length</span><b id="win">–</b></div>
+    <div class="row"><span>Sample rate</span><b id="sr">–</b></div>
+    <div class="row"><span>Home-screen mode</span><b id="mode">–</b></div>
+  </div>
+
+  <div class="card"><div id="log"></div></div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const log = msg => { $('log').textContent += msg + '\n'; };
+  const NAMES = ['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
+  const A4 = 440, MIN_HZ = 55, MAX_HZ = 1100, RMS_GATE = 0.008, CLARITY_MIN = 0.85;
+
+  const standalone = window.navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+  $('mode').textContent = standalone ? 'Yes' : 'No (Safari)';
+  log('User agent: ' + navigator.userAgent);
+
+  let ctx, analyser, buf, running = false, frames = 0, lastTick = 0;
+
+  // McLeod pitch method (normalised square difference), with parabolic interpolation.
+  function detect(x, sr) {
+    const n = x.length;
+    let rms = 0;
+    for (let i = 0; i < n; i++) rms += x[i] * x[i];
+    rms = Math.sqrt(rms / n);
+    if (rms < RMS_GATE) return { rms };
+
+    const minLag = Math.floor(sr / MAX_HZ), maxLag = Math.ceil(sr / MIN_HZ);
+    const w = n - maxLag;
+    const nsdf = new Float32Array(maxLag + 2);
+    for (let tau = 0; tau <= maxLag + 1; tau++) {
+      let ac = 0, m = 0;
+      for (let i = 0; i < w; i++) { const a = x[i], b = x[i + tau]; ac += a * b; m += a * a + b * b; }
+      nsdf[tau] = m > 0 ? 2 * ac / m : 0;
+    }
+
+    // Collect the highest point of each positive region after the first dip below zero.
+    const peaks = [];
+    let tau = 1;
+    while (tau < maxLag && nsdf[tau] > 0) tau++;
+    let best = -1, bestVal = -Infinity;
+    for (; tau <= maxLag; tau++) {
+      if (nsdf[tau] > 0) {
+        if (nsdf[tau] > bestVal) { bestVal = nsdf[tau]; best = tau; }
+      } else if (best > 0) {
+        peaks.push(best); best = -1; bestVal = -Infinity;
+      }
+    }
+    if (best > 0) peaks.push(best);
+    const usable = peaks.filter(p => p >= minLag);
+    if (!usable.length) return { rms };
+
+    const top = Math.max(...usable.map(p => nsdf[p]));
+    const pick = usable.find(p => nsdf[p] >= 0.9 * top);
+    const y0 = nsdf[pick - 1], y1 = nsdf[pick], y2 = nsdf[pick + 1];
+    const d = y0 - 2 * y1 + y2;
+    const shift = d !== 0 ? 0.5 * (y0 - y2) / d : 0;
+    return { rms, hz: sr / (pick + shift), clarity: y1 };
+  }
+
+  function show(r) {
+    $('level').style.width = Math.min(100, r.rms * 400) + '%';
+    if (!r.hz || r.clarity < CLARITY_MIN) {
+      $('clarity').textContent = r.clarity ? r.clarity.toFixed(2) : '–';
+      return;
+    }
+    const midi = 69 + 12 * Math.log2(r.hz / A4);
+    const near = Math.round(midi);
+    const cents = Math.round((midi - near) * 100);
+    const colour = Math.abs(cents) <= 10 ? 'var(--green)' : Math.abs(cents) <= 25 ? 'var(--amber)' : 'var(--red)';
+    $('note').innerHTML = NAMES[((near % 12) + 12) % 12] + '<small>' + (Math.floor(near / 12) - 1) + '</small>';
+    $('cents').textContent = (cents > 0 ? '+' : cents < 0 ? '−' : '±') + Math.abs(cents) + ' cents';
+    $('cents').style.color = colour;
+    $('hz').textContent = r.hz.toFixed(2) + ' Hz';
+    $('clarity').textContent = r.clarity.toFixed(2);
+  }
+
+  function loop(now) {
+    if (!running) return;
+    analyser.getFloatTimeDomainData(buf);
+    const t0 = performance.now();
+    const r = detect(buf, ctx.sampleRate);
+    $('ms').textContent = (performance.now() - t0).toFixed(1) + ' ms';
+    show(r);
+    frames++;
+    if (now - lastTick >= 1000) { $('ups').textContent = frames; frames = 0; lastTick = now; }
+    requestAnimationFrame(loop);
+  }
+
+  async function start() {
+    try {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      await ctx.resume();
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+      });
+      const src = ctx.createMediaStreamSource(stream);
+      analyser = ctx.createAnalyser();
+      analyser.fftSize = 4096;
+      src.connect(analyser);
+      buf = new Float32Array(analyser.fftSize);
+      $('sr').textContent = ctx.sampleRate + ' Hz';
+      $('win').textContent = Math.round(1000 * analyser.fftSize / ctx.sampleRate) + ' ms';
+      const track = stream.getAudioTracks()[0];
+      log('Microphone: ' + (track.label || 'unnamed'));
+      log('Settings: ' + JSON.stringify(track.getSettings ? track.getSettings() : {}));
+      running = true;
+      $('start').textContent = 'Stop';
+      lastTick = performance.now();
+      requestAnimationFrame(loop);
+      start.stream = stream;
+    } catch (e) {
+      log('Error: ' + e.name + ' – ' + e.message);
+    }
+  }
+
+  function stop() {
+    running = false;
+    if (start.stream) start.stream.getTracks().forEach(t => t.stop());
+    if (ctx) ctx.close();
+    $('start').textContent = 'Start';
+    $('level').style.width = '0';
+  }
+
+  $('start').addEventListener('click', () => running ? stop() : start());
+  document.addEventListener('visibilitychange', () => { if (document.hidden && running) { stop(); log('Stopped: app went to background.'); } });
+})();
+</script>
+</body>
+</html>

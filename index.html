@@ -142,7 +142,7 @@
     <svg id="board" viewBox="44 0 302 462" preserveAspectRatio="xMidYMin meet" role="img"></svg>
     <button id="startBtn" class="bigStart" type="button">Start</button>
     <button id="setBtn" class="round cog" type="button" aria-label="Settings">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v2.4M12 19.1v2.4M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.6 19.4l1.7-1.7M17.7 6.3l1.7-1.7"/></svg>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     </button>
   </div>
 </main>
@@ -280,14 +280,14 @@
   const VB_X = 44, VB_W = 302;
   let vbY = 0, vbH = 462, labY = 15;
   const taper = y => (y - NUT) * BASE / SCALE;   // keeps the taper the same however far the board is stretched
-  const edgeL = y => 60 + 12 * taper(y) / 446, edgeR = y => 330 - 12 * taper(y) / 446;
+  const edgeL = y => 84 + 12 * taper(y) / 446, edgeR = y => 306 - 12 * taper(y) / 446;
   // The board runs behind the readout, so the nut is hidden and the first semitone sits just below it.
   function fitBoard() {
     const r = $('board').getBoundingClientRect();
     if (!r.width) return;
     const k = r.width / VB_W;                                   // screen px per board unit
     const R = document.querySelector('.barLabels').getBoundingClientRect().bottom - r.top;
-    const top1 = R + 46;                                                         // screen y of the first semitone
+    const top1 = R + 30;                                                        // screen y of the first semitone
     const bottom6 = $('setBtn').getBoundingClientRect().bottom - r.top - 24;     // screen y of the sixth
     const f = n => 1 - Math.pow(2, -n / 12);
     const sc = Math.max(900, (bottom6 - top1) / k / (f(6) - f(1)));
@@ -356,7 +356,6 @@
         <g opacity=".55" filter="url(#soft)" fill="#000">${shadows}</g>
         ${strings}
       </g>
-      <g ${font} font-weight="700" font-size="14" text-anchor="middle" fill="#efe6da" aria-hidden="true">${openLabels}</g>
       <g ${font} font-weight="500" font-size="11" fill="#cfc3b5" aria-hidden="true">${labels}</g>
       <g id="dot" visibility="hidden" aria-hidden="true">
         <circle id="dotGlow" r="15" opacity=".55" filter="url(#glow)" style="fill:var(--sig)"/>

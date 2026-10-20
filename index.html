@@ -14,14 +14,21 @@
 <title>Cello Pitch Monitor</title>
 <style>
   :root, [data-theme="dark"] {
-    --bg:#0e0c0b; --fg:#f3ede6; --muted:#b9aea2; --track:#221d1a; --centre:#6d635a;
-    --btn-bg:#1d1916; --btn-border:#3a322c; --card:#1a1613; --card-line:#2c2622; --board-top:#efe6da;
+    --bg:#0e0c0b; --fg:#f3ede6; --muted:#b9aea2; --board-top:#efe6da;
     --green:#3ecf7f; --amber:#f5b546; --red:#ff6b6b;
   }
   [data-theme="light"] {
-    --bg:#f6f1ea; --fg:#1c1714; --muted:#5e544b; --track:#e4dcd1; --centre:#a1958a;
-    --btn-bg:#ffffff; --btn-border:#d6ccbf; --card:#ffffff; --card-line:#e2d9cd; --board-top:#2a221c;
+    --bg:#f6f1ea; --fg:#1c1714; --muted:#5e544b; --board-top:#2a221c;
     --green:#16804a; --amber:#a86300; --red:#c42b2b;
+  }
+  /* Surfaces are derived from the chosen background, so any background colour works. */
+  :root {
+    --track: color-mix(in srgb, var(--fg) 10%, var(--bg));
+    --centre: color-mix(in srgb, var(--fg) 40%, var(--bg));
+    --btn-bg: color-mix(in srgb, var(--fg) 7%, var(--bg));
+    --btn-border: color-mix(in srgb, var(--fg) 20%, var(--bg));
+    --card: color-mix(in srgb, var(--fg) 6%, var(--bg));
+    --card-line: color-mix(in srgb, var(--fg) 12%, var(--bg));
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); overscroll-behavior: none; }
@@ -35,24 +42,21 @@
   #app[data-state="amber"] { --sig: var(--amber); }
   #app[data-state="red"]   { --sig: var(--red); }
 
-  .readout { padding: 0 24px; display: flex; flex-direction: column; gap: 10px; flex: none; }
-  .top { display: flex; justify-content: space-between; align-items: center; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-  .status { display: flex; align-items: center; gap: 6px; }
-  .status i { width: 8px; height: 8px; border-radius: 4px; background: var(--muted); display: inline-block; }
-  .listening .status i { background: var(--green); }
-  .mid { display: flex; align-items: center; justify-content: space-between; height: 140px; }
-  .note { display: flex; align-items: baseline; line-height: 1; }
-  #noteName { font-size: 104px; font-weight: 700; letter-spacing: -.04em; }
-  #octave { font-size: 38px; font-weight: 500; color: var(--muted); margin-left: 4px; }
-  .hz { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; margin-top: 6px; min-height: 1.2em; }
-  .arrowBox { width: 140px; height: 140px; display: flex; align-items: center; justify-content: center; }
-  #arrow { width: 120px; height: 140px; transition: transform 90ms linear; display: none; }
+  .readout { padding: 0 20px; display: flex; flex-direction: column; gap: 6px; flex: none; }
+  .mid { display: flex; align-items: center; gap: 8px; height: 104px; }
+  .note { display: flex; align-items: baseline; line-height: 1; min-width: 132px; }
+  #noteName { font-size: 86px; font-weight: 700; letter-spacing: -.04em; }
+  #octave { font-size: 30px; font-weight: 500; color: var(--muted); margin-left: 3px; }
+  .centsCol { flex: 1; display: flex; flex-direction: column; align-items: center; color: var(--sig); line-height: 1.1; }
+  #cents { font-size: 38px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  #centsWord { font-size: 15px; font-weight: 500; }
+  .arrowBox { width: 100px; height: 104px; flex: none; display: flex; align-items: center; justify-content: center; }
+  #arrow { width: 88px; height: 104px; transition: transform 90ms linear; display: none; }
   #arrow path { fill: var(--sig); stroke: var(--sig); }
-  #tick { width: 110px; height: 110px; display: none; }
+  #tick { width: 84px; height: 84px; display: none; }
   #tick circle, #tick path { stroke: var(--green); }
-  .centsLine { display: flex; align-items: baseline; gap: 10px; color: var(--sig); min-height: 48px; }
-  #cents { font-size: 40px; font-weight: 700; font-variant-numeric: tabular-nums; }
-  #centsWord { font-size: 18px; font-weight: 500; }
+  .hz { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; min-height: 1.2em; }
+  .live { width: 8px; height: 8px; border-radius: 4px; background: var(--green); display: inline-block; }
   .bar { position: relative; height: 16px; border-radius: 8px; background: var(--track); overflow: hidden; }
   #zone { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb, var(--green) 30%, transparent); }
   .bar .centre { position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; margin-left: -1px; background: var(--centre); }
@@ -63,7 +67,14 @@
   .board { flex: 1 1 auto; min-height: 0; display: flex; justify-content: center; }
   #board { width: 100%; height: 100%; max-width: 520px; display: block; }
 
-  .controls { flex: none; display: flex; align-items: center; gap: 10px; padding: 6px 20px 16px; }
+  .controls { flex: none; display: flex; align-items: center; gap: 10px; padding: 4px 20px 12px; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 9px; }
+  .swatches label { position: relative; width: 42px; height: 42px; border-radius: 21px; border: 2px solid var(--btn-border); display: block; }
+  .swatches label.on, .swatches label:has(input:checked) { outline: 3px solid var(--green); outline-offset: 2px; }
+  .swatches input[type=radio] { position: absolute; inset: 0; opacity: 0; margin: 0; }
+  .swatches .custom { overflow: hidden; background: conic-gradient(#e55, #ec5, #5c7, #5ae, #a6e, #e55); }
+  .swatches input[type=color] { position: absolute; inset: -8px; width: 60px; height: 60px; opacity: 0; border: 0; padding: 0; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   button { font: inherit; color: var(--fg); }
   .pill { height: 48px; padding: 0 18px; border-radius: 24px; border: 1px solid var(--btn-border); background: var(--btn-bg); font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
   .pill.primary { background: var(--fg); color: var(--bg); border-color: var(--fg); }
@@ -97,12 +108,9 @@
 <body>
 <main id="app" class="idle">
   <section class="readout" aria-live="off">
-    <div class="top"><span>Nearest note</span><span class="status"><i></i><span id="statusText">Paused</span></span></div>
     <div class="mid">
-      <div>
-        <div class="note"><span id="noteName">–</span><span id="octave"></span></div>
-        <div class="hz" id="hzLine">Tap Start to listen</div>
-      </div>
+      <div class="note"><span id="noteName">–</span><span id="octave"></span></div>
+      <div class="centsCol"><span id="cents"></span><span id="centsWord"></span></div>
       <div class="arrowBox">
         <svg id="arrow" viewBox="0 0 100 120" role="img" aria-label="Pitch direction">
           <defs><linearGradient id="arrowShine" x1="0" y1="0" x2="1" y2="0">
@@ -117,12 +125,12 @@
         </svg>
       </div>
     </div>
-    <div class="centsLine"><span id="cents"></span><span id="centsWord"></span></div>
+    <div class="hz" id="hzLine">Tap Start to listen</div>
     <div class="bar" aria-hidden="true"><div id="zone"></div><div class="centre"></div><div id="marker"></div></div>
     <div class="barLabels" aria-hidden="true"><span>−50 flat</span><span>0</span><span>sharp +50</span></div>
   </section>
 
-  <div class="board"><svg id="board" viewBox="0 0 390 470" preserveAspectRatio="xMidYMid meet" role="img"></svg></div>
+  <div class="board"><svg id="board" viewBox="44 0 302 462" preserveAspectRatio="xMidYMid meet" role="img"></svg></div>
 
   <nav class="controls" aria-label="Controls">
     <button id="startBtn" class="pill primary" type="button">Start</button>
@@ -169,6 +177,12 @@
       <div class="hint">Automatic follows your iPhone's setting.</div>
     </fieldset>
 
+    <fieldset class="card">
+      <legend>Background</legend>
+      <div class="swatches" id="swatches"></div>
+      <div class="hint" id="bgHint">Each appearance remembers its own background. Text switches between light and dark to suit the colour you choose.</div>
+    </fieldset>
+
     <div class="card row">
       <label for="mirror" class="lab"><span class="title">Mirror strings</span><span class="hint">On: A D G C, left to right. Off: C G D A.</span></label>
       <input id="mirror" type="checkbox">
@@ -189,7 +203,11 @@
   const MIN_HZ = 55, MAX_HZ = 1100, CLARITY_MIN = 0.85, HOLD_MS = 450;
 
   // ---------- Settings ----------
-  const DEFAULTS = { band: 10, ref: 440, sens: 50, theme: 'dark', mirror: true, awake: true };
+  const DEFAULTS = { band: 10, ref: 440, sens: 50, theme: 'dark', mirror: true, awake: true, bgDark: '#0e0c0b', bgLight: '#f6f1ea' };
+  const SWATCHES = {
+    dark: [['#0e0c0b', 'Charcoal'], ['#000000', 'Black'], ['#0b1424', 'Navy'], ['#0b1a12', 'Forest'], ['#1a0f1c', 'Aubergine']],
+    light: [['#f6f1ea', 'Ivory'], ['#ffffff', 'White'], ['#e7e3dc', 'Stone'], ['#e6eef7', 'Sky'], ['#e6efe4', 'Sage']]
+  };
   let S = { ...DEFAULTS };
   try { Object.assign(S, JSON.parse(localStorage.getItem('celloPitch.settings') || '{}')); } catch (e) {}
   const save = () => { try { localStorage.setItem('celloPitch.settings', JSON.stringify(S)); } catch (e) {} };
@@ -197,12 +215,33 @@
   const amberLimit = () => Math.max(25, S.band + 10);
 
   const darkQuery = matchMedia('(prefers-color-scheme: dark)');
-  function applyTheme() {
-    const t = S.theme === 'auto' ? (darkQuery.matches ? 'dark' : 'light') : S.theme;
-    document.documentElement.dataset.theme = t;
-    document.querySelector('meta[name="theme-color"]').content = t === 'light' ? '#f6f1ea' : '#0e0c0b';
+  const effTheme = () => S.theme === 'auto' ? (darkQuery.matches ? 'dark' : 'light') : S.theme;
+  const bgKey = () => effTheme() === 'dark' ? 'bgDark' : 'bgLight';
+  function luminance(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    const c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
   }
-  darkQuery.addEventListener('change', applyTheme);
+  function applyTheme(rebuild = true) {
+    const bg = S[bgKey()];
+    const root = document.documentElement;
+    root.dataset.theme = luminance(bg) > 0.18 ? 'light' : 'dark';   // text colours suit the background
+    root.style.setProperty('--bg', bg);
+    document.querySelector('meta[name="theme-color"]').content = bg;
+    if (rebuild) buildSwatches();
+  }
+  function buildSwatches() {
+    const bg = S[bgKey()], list = SWATCHES[effTheme()];
+    const preset = list.some(([c]) => c === bg);
+    $('swatches').innerHTML = list.map(([c, name]) =>
+      `<label style="background:${c}"><input type="radio" name="bg" value="${c}"${c === bg ? ' checked' : ''}><span class="sr">${name}</span></label>`
+    ).join('') + `<label class="custom${preset ? '' : ' on'}"><input type="color" value="${bg}" aria-label="Custom colour"></label>`;
+    $('swatches').querySelectorAll('input[type=radio]').forEach(r => r.addEventListener('change', e => { S[bgKey()] = e.target.value; save(); applyTheme(); }));
+    const picker = $('swatches').querySelector('input[type=color]');
+    picker.addEventListener('input', e => { S[bgKey()] = e.target.value; applyTheme(false); });
+    picker.addEventListener('change', e => { S[bgKey()] = e.target.value; save(); applyTheme(); });
+  }
+  darkQuery.addEventListener('change', () => applyTheme());
 
   function applySettings() {
     applyTheme();
@@ -275,7 +314,7 @@
         <filter id="soft" x="-50%" y="-5%" width="200%" height="110%"><feGaussianBlur stdDeviation="1.6"/></filter>
         <filter id="glow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="5"/></filter>
         <clipPath id="boardClip"><polygon points="86,24 304,24 334,470 56,470"/></clipPath>
-        <clipPath id="viewClip"><rect x="0" y="0" width="390" height="470"/></clipPath>
+        <clipPath id="viewClip"><rect x="44" y="0" width="302" height="462"/></clipPath>
       </defs>
       <g aria-hidden="true" clip-path="url(#viewClip)">
         <polygon points="86,24 304,24 334,470 56,470" fill="url(#ebony)"/>
@@ -288,7 +327,7 @@
         <rect id="hl" x="0" y="0" width="24" height="3.6" rx="1.8" fill="#fbf3e9" fill-opacity=".85" visibility="hidden"/>
         <g opacity=".55" filter="url(#soft)" fill="#000">${shadows}</g>
         ${strings}
-        <rect x="0" y="392" width="390" height="78" fill="url(#fadeOut)"/>
+        <rect x="0" y="386" width="390" height="77" fill="url(#fadeOut)"/>
       </g>
       <g ${font} font-weight="700" font-size="14" text-anchor="middle" style="fill:var(--board-top)" aria-hidden="true">${openLabels}</g>
       <g ${font} font-weight="500" font-size="11" fill="#cfc3b5" aria-hidden="true">${labels}</g>
@@ -433,9 +472,7 @@
       src.connect(analyser);
       buf = new Float32Array(analyser.fftSize);
       running = true;
-      app.classList.add('listening');
-      $('statusText').textContent = 'Listening';
-      $('startBtn').textContent = 'Pause'; $('startBtn').classList.remove('primary');
+      $('startBtn').innerHTML = '<i class="live" aria-hidden="true"></i>Pause'; $('startBtn').classList.remove('primary');
       $('hzLine').textContent = 'Play a note';
       lockScreen();
       requestAnimationFrame(loop);
@@ -451,8 +488,6 @@
     if (ctx) ctx.close().catch(() => {});
     ctx = analyser = stream = null;
     unlockScreen();
-    app.classList.remove('listening');
-    $('statusText').textContent = 'Paused';
     $('startBtn').textContent = 'Start'; $('startBtn').classList.add('primary');
     $('hzLine').textContent = 'Tap Start to listen';
     showIdle();

@@ -64,8 +64,14 @@
   .barLabels { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .idle .note, .idle .hz { opacity: .45; }
 
-  .board { flex: 1 1 auto; min-height: 0; display: flex; justify-content: center; }
-  #board { width: 100%; height: 100%; max-width: 520px; display: block; }
+  .board { position: relative; flex: 1 1 auto; min-height: 0; margin-top: 6px; }
+  #board { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .bigStart { position: absolute; left: 50%; top: 50%; width: 132px; height: 132px; margin: -66px 0 0 -66px; border-radius: 66px;
+    border: 0; background: var(--fg); color: var(--bg); font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.45); transition: opacity .25s; }
+  .bigStart .live { width: 10px; height: 10px; border-radius: 5px; }
+  .cog { position: absolute; right: 16px; bottom: 12px; width: 52px; height: 52px; border-radius: 26px; transition: opacity .25s; box-shadow: 0 4px 16px rgba(0,0,0,.35); }
+  .gone { opacity: 0; pointer-events: none; }
 
   .controls { flex: none; display: flex; align-items: center; gap: 10px; padding: 4px 20px 12px; }
   .swatches { display: flex; flex-wrap: wrap; gap: 9px; }
@@ -130,16 +136,13 @@
     <div class="barLabels" aria-hidden="true"><span>−50 flat</span><span>0</span><span>sharp +50</span></div>
   </section>
 
-  <div class="board"><svg id="board" viewBox="44 0 302 462" preserveAspectRatio="xMidYMid meet" role="img"></svg></div>
-
-  <nav class="controls" aria-label="Controls">
-    <button id="startBtn" class="pill primary" type="button">Start</button>
-    <button id="refBtn" class="pill" type="button">A4 = 440 Hz</button>
-    <span class="spacer"></span>
-    <button id="setBtn" class="round" type="button" aria-label="Settings">
+  <div class="board" id="boardWrap">
+    <svg id="board" viewBox="44 0 302 462" preserveAspectRatio="xMidYMin meet" role="img"></svg>
+    <button id="startBtn" class="bigStart" type="button">Start</button>
+    <button id="setBtn" class="round cog" type="button" aria-label="Settings">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v2.4M12 19.1v2.4M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.6 19.4l1.7-1.7M17.7 6.3l1.7-1.7"/></svg>
     </button>
-  </nav>
+  </div>
 </main>
 
 <dialog id="settings" aria-label="Settings">
@@ -246,7 +249,7 @@
   function applySettings() {
     applyTheme();
     $('band').value = S.band; $('bandOut').textContent = '± ' + S.band + ' cents';
-    $('refOut').textContent = 'A4 = ' + S.ref + ' Hz'; $('refBtn').textContent = 'A4 = ' + S.ref + ' Hz';
+    $('refOut').textContent = 'A4 = ' + S.ref + ' Hz';
     $('sens').value = S.sens;
     $('mirror').checked = S.mirror; $('awake').checked = S.awake;
     document.querySelectorAll('input[name=theme]').forEach(r => { r.checked = r.value === S.theme; });
@@ -263,27 +266,40 @@
   document.querySelectorAll('input[name=theme]').forEach(r => r.addEventListener('change', e => { S.theme = e.target.value; save(); applySettings(); }));
   const dlg = $('settings');
   $('setBtn').addEventListener('click', () => dlg.showModal());
-  $('refBtn').addEventListener('click', () => dlg.showModal());
   $('doneBtn').addEventListener('click', () => dlg.close());
 
   // ---------- Fingerboard ----------
   // Strings: open MIDI note, display name, thickness, gradient id.
   const STRINGS = { A: { midi: 57, w: 2.2, g: 'strA' }, D: { midi: 50, w: 2.8, g: 'strD' }, G: { midi: 43, w: 3.6, g: 'strG' }, C: { midi: 36, w: 4.6, g: 'strC' } };
   const NUT = 36, SCALE = 1350, BOTTOM = 470;
-  const SLOT_TOP = [127.5, 172.5, 217.5, 262.5], SLOT_BOT = [101, 163, 225, 287];
+  // Strings and board taper slightly towards the bottom of the screen (the player's view).
+  const SLOT_TOP = [117, 169, 221, 273], SLOT_BOT = [126, 172, 218, 264];
+  const VB_X = 44, VB_W = 302;
+  let vbH = 462;
+  const edgeL = y => 60 + 12 * (y - 24) / 446, edgeR = y => 330 - 12 * (y - 24) / 446;
+  function fitBoard() {
+    const r = $('board').getBoundingClientRect();
+    const h = r.width > 0 ? Math.max(462, VB_W * r.height / r.width) : 462;
+    if (Math.abs(h - vbH) < 0.5 && $('board').firstChild) return;
+    vbH = h;
+    $('board').setAttribute('viewBox', `${VB_X} 0 ${VB_W} ${vbH.toFixed(1)}`);
+    buildBoard();
+  }
   const slotX = (k, y) => SLOT_TOP[k] + (SLOT_BOT[k] - SLOT_TOP[k]) * (y - NUT) / (BOTTOM - NUT);
   const posY = n => NUT + SCALE * (1 - Math.pow(2, -n / 12));
   const order = () => S.mirror ? ['A', 'D', 'G', 'C'] : ['C', 'G', 'D', 'A'];
 
   function buildBoard() {
     const ord = order();
+    const yb = vbH + 20;
+    const poly = `${edgeL(24)},24 ${edgeR(24)},24 ${edgeR(yb).toFixed(1)},${yb.toFixed(1)} ${edgeL(yb).toFixed(1)},${yb.toFixed(1)}`;
     let strings = '', shadows = '', ticks = '', labels = '', openLabels = '';
     ord.forEach((name, k) => {
       const s = STRINGS[name];
       const slope = (SLOT_BOT[k] - SLOT_TOP[k]) / (BOTTOM - NUT);
       const x0 = SLOT_TOP[k] - slope * NUT;
       const ang = (-Math.atan(slope) * 180 / Math.PI).toFixed(3);
-      const r = `<rect x="${-s.w / 2}" y="0" width="${s.w}" height="482"`;
+      const r = `<rect x="${-s.w / 2}" y="0" width="${s.w}" height="${(vbH + 30).toFixed(0)}"`;
       shadows += `<g transform="translate(${(x0 + 3.5 + k * 0.5).toFixed(1)} 0) rotate(${ang})">${r}/></g>`;
       strings += `<g transform="translate(${x0.toFixed(2)} 0) rotate(${ang})">${r} fill="url(#${s.g})"/>${r} fill="url(#winding)" opacity="${name === 'A' ? 0.5 : 1}"/></g>`;
       openLabels += `<text x="${slotX(k, 15).toFixed(1)}" y="15">${name}</text>`;
@@ -313,21 +329,21 @@
         </filter>
         <filter id="soft" x="-50%" y="-5%" width="200%" height="110%"><feGaussianBlur stdDeviation="1.6"/></filter>
         <filter id="glow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="5"/></filter>
-        <clipPath id="boardClip"><polygon points="86,24 304,24 334,470 56,470"/></clipPath>
-        <clipPath id="viewClip"><rect x="44" y="0" width="302" height="462"/></clipPath>
+        <clipPath id="boardClip"><polygon points="${poly}"/></clipPath>
+        <clipPath id="viewClip"><rect x="${VB_X}" y="0" width="${VB_W}" height="${vbH.toFixed(1)}"/></clipPath>
       </defs>
       <g aria-hidden="true" clip-path="url(#viewClip)">
-        <polygon points="86,24 304,24 334,470 56,470" fill="url(#ebony)"/>
-        <rect x="0" y="0" width="390" height="470" filter="url(#grain)" opacity=".22" clip-path="url(#boardClip)"/>
-        <line x1="87" y1="24" x2="57" y2="470" stroke="#5a4a3e" stroke-opacity=".55" stroke-width="1.2"/>
-        <line x1="303" y1="24" x2="333" y2="470" stroke="#000" stroke-opacity=".7" stroke-width="1.5"/>
-        <rect x="82" y="22" width="226" height="14" rx="2.5" fill="url(#nutGrad)"/>
-        <rect x="83" y="22.5" width="224" height="1.5" rx=".75" fill="#8a7564" fill-opacity=".6"/>
+        <polygon points="${poly}" fill="url(#ebony)"/>
+        <rect x="0" y="0" width="390" height="${yb.toFixed(0)}" filter="url(#grain)" opacity=".22" clip-path="url(#boardClip)"/>
+        <line x1="${edgeL(24) + 1}" y1="24" x2="${(edgeL(yb) + 1).toFixed(1)}" y2="${yb.toFixed(0)}" stroke="#5a4a3e" stroke-opacity=".55" stroke-width="1.2"/>
+        <line x1="${edgeR(24) - 1}" y1="24" x2="${(edgeR(yb) - 1).toFixed(1)}" y2="${yb.toFixed(0)}" stroke="#000" stroke-opacity=".7" stroke-width="1.5"/>
+        <rect x="56" y="22" width="278" height="14" rx="2.5" fill="url(#nutGrad)"/>
+        <rect x="57" y="22.5" width="276" height="1.5" rx=".75" fill="#8a7564" fill-opacity=".6"/>
         <g fill="#fbf3e9" fill-opacity=".38">${ticks}</g>
         <rect id="hl" x="0" y="0" width="24" height="3.6" rx="1.8" fill="#fbf3e9" fill-opacity=".85" visibility="hidden"/>
         <g opacity=".55" filter="url(#soft)" fill="#000">${shadows}</g>
         ${strings}
-        <rect x="0" y="386" width="390" height="77" fill="url(#fadeOut)"/>
+        <rect x="0" y="${(vbH - 90).toFixed(1)}" width="390" height="91" fill="url(#fadeOut)"/>
       </g>
       <g ${font} font-weight="700" font-size="14" text-anchor="middle" style="fill:var(--board-top)" aria-hidden="true">${openLabels}</g>
       <g ${font} font-weight="500" font-size="11" fill="#cfc3b5" aria-hidden="true">${labels}</g>
@@ -472,7 +488,8 @@
       src.connect(analyser);
       buf = new Float32Array(analyser.fftSize);
       running = true;
-      $('startBtn').innerHTML = '<i class="live" aria-hidden="true"></i>Pause'; $('startBtn').classList.remove('primary');
+      $('startBtn').innerHTML = '<i class="live" aria-hidden="true"></i>Pause';
+      hideControls();
       $('hzLine').textContent = 'Play a note';
       lockScreen();
       requestAnimationFrame(loop);
@@ -488,12 +505,27 @@
     if (ctx) ctx.close().catch(() => {});
     ctx = analyser = stream = null;
     unlockScreen();
-    $('startBtn').textContent = 'Start'; $('startBtn').classList.add('primary');
+    $('startBtn').textContent = 'Start';
+    showControls();
     $('hzLine').textContent = 'Tap Start to listen';
     showIdle();
   }
 
+  // Controls: always shown while paused; while listening they hide, and a tap brings them back for a few seconds.
+  let hideTimer = null;
+  function showControls() {
+    clearTimeout(hideTimer);
+    $('startBtn').classList.remove('gone'); $('setBtn').classList.remove('gone');
+    if (running) hideTimer = setTimeout(hideControls, 3000);
+  }
+  function hideControls() {
+    clearTimeout(hideTimer);
+    $('startBtn').classList.add('gone'); $('setBtn').classList.add('gone');
+  }
+  $('app').addEventListener('pointerdown', e => { if (running && !e.target.closest('button')) showControls(); });
   $('startBtn').addEventListener('click', () => running ? stop() : start());
+  if ('ResizeObserver' in window) new ResizeObserver(fitBoard).observe($('boardWrap'));
+  else addEventListener('resize', fitBoard);
   document.addEventListener('visibilitychange', () => { if (document.hidden && running) stop(); });
 
   applySettings();

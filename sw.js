@@ -1,5 +1,5 @@
 // Offline cache. Change VERSION whenever you upload new files, so iPhones pick up the update.
-const VERSION = 'cello-pitch-v3';
+const VERSION = 'cello-pitch-v4';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-180.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {

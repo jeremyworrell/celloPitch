@@ -35,14 +35,15 @@
   body { font-family: -apple-system, "SF Pro Text", system-ui, sans-serif; -webkit-user-select: none; user-select: none; }
   #app {
     height: 100dvh; display: flex; flex-direction: column;
-    padding: calc(env(safe-area-inset-top) + 14px) 0 env(safe-area-inset-bottom);
+    position: relative; padding: 0;
     --sig: var(--muted);
   }
   #app[data-state="green"] { --sig: var(--green); }
   #app[data-state="amber"] { --sig: var(--amber); }
   #app[data-state="red"]   { --sig: var(--red); }
 
-  .readout { padding: 0 20px; display: flex; flex-direction: column; gap: 6px; flex: none; }
+  .readout { position: relative; z-index: 1; padding: calc(env(safe-area-inset-top) + 14px) 20px 30px; display: flex; flex-direction: column; gap: 6px; flex: none;
+    background: linear-gradient(to bottom, var(--bg) 0%, var(--bg) 62%, color-mix(in srgb, var(--bg) 75%, transparent) 84%, transparent 100%); pointer-events: none; }
   .mid { display: flex; align-items: center; gap: 8px; height: 104px; }
   .note { display: flex; align-items: baseline; line-height: 1; min-width: 132px; }
   #noteName { font-size: 86px; font-weight: 700; letter-spacing: -.04em; }
@@ -64,13 +65,14 @@
   .barLabels { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .idle .note, .idle .hz { opacity: .45; }
 
-  .board { position: relative; flex: 1 1 auto; min-height: 0; margin-top: 6px; }
+  .board { position: absolute; inset: 0; }
+  .bigStart, .cog { z-index: 2; }
   #board { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   .bigStart { position: absolute; left: 50%; top: 50%; width: 132px; height: 132px; margin: -66px 0 0 -66px; border-radius: 66px;
     border: 0; background: var(--fg); color: var(--bg); font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px;
     box-shadow: 0 8px 30px rgba(0,0,0,.45); transition: opacity .25s; }
   .bigStart .live { width: 10px; height: 10px; border-radius: 5px; }
-  .cog { position: absolute; right: 16px; bottom: 12px; width: 52px; height: 52px; border-radius: 26px; transition: opacity .25s; box-shadow: 0 4px 16px rgba(0,0,0,.35); }
+  .cog { position: absolute; right: 16px; bottom: calc(env(safe-area-inset-bottom) + 12px); width: 52px; height: 52px; border-radius: 26px; transition: opacity .25s; box-shadow: 0 4px 16px rgba(0,0,0,.35); }
   .gone { opacity: 0; pointer-events: none; }
 
   .controls { flex: none; display: flex; align-items: center; gap: 10px; padding: 4px 20px 12px; }
@@ -275,14 +277,19 @@
   // Strings and board taper slightly towards the bottom of the screen (the player's view).
   const SLOT_TOP = [117, 169, 221, 273], SLOT_BOT = [126, 172, 218, 264];
   const VB_X = 44, VB_W = 302;
-  let vbH = 462;
+  let vbY = 0, vbH = 462, labY = 15;
   const edgeL = y => 60 + 12 * (y - 24) / 446, edgeR = y => 330 - 12 * (y - 24) / 446;
+  // The board runs behind the readout, so the nut is hidden and the first semitone sits just below it.
   function fitBoard() {
     const r = $('board').getBoundingClientRect();
-    const h = r.width > 0 ? Math.max(462, VB_W * r.height / r.width) : 462;
-    if (Math.abs(h - vbH) < 0.5 && $('board').firstChild) return;
-    vbH = h;
-    $('board').setAttribute('viewBox', `${VB_X} 0 ${VB_W} ${vbH.toFixed(1)}`);
+    if (!r.width) return;
+    const k = r.width / VB_W;                                   // screen px per board unit
+    const R = document.querySelector('.barLabels').getBoundingClientRect().bottom - r.top;
+    const y0 = posY(1) - (R + 46) / k;
+    const h = r.height / k;
+    if (Math.abs(y0 - vbY) < 0.3 && Math.abs(h - vbH) < 0.3 && $('board').firstChild) return;
+    vbY = y0; vbH = h; labY = y0 + (R + 22) / k;
+    $('board').setAttribute('viewBox', `${VB_X} ${vbY.toFixed(1)} ${VB_W} ${vbH.toFixed(1)}`);
     buildBoard();
   }
   const slotX = (k, y) => SLOT_TOP[k] + (SLOT_BOT[k] - SLOT_TOP[k]) * (y - NUT) / (BOTTOM - NUT);
@@ -291,18 +298,18 @@
 
   function buildBoard() {
     const ord = order();
-    const yb = vbH + 20;
-    const poly = `${edgeL(24)},24 ${edgeR(24)},24 ${edgeR(yb).toFixed(1)},${yb.toFixed(1)} ${edgeL(yb).toFixed(1)},${yb.toFixed(1)}`;
+    const yt = vbY - 10, yb = vbY + vbH + 20;
+    const poly = `${edgeL(yt).toFixed(1)},${yt.toFixed(1)} ${edgeR(yt).toFixed(1)},${yt.toFixed(1)} ${edgeR(yb).toFixed(1)},${yb.toFixed(1)} ${edgeL(yb).toFixed(1)},${yb.toFixed(1)}`;
     let strings = '', shadows = '', ticks = '', labels = '', openLabels = '';
     ord.forEach((name, k) => {
       const s = STRINGS[name];
       const slope = (SLOT_BOT[k] - SLOT_TOP[k]) / (BOTTOM - NUT);
       const x0 = SLOT_TOP[k] - slope * NUT;
       const ang = (-Math.atan(slope) * 180 / Math.PI).toFixed(3);
-      const r = `<rect x="${-s.w / 2}" y="0" width="${s.w}" height="${(vbH + 30).toFixed(0)}"`;
+      const r = `<rect x="${-s.w / 2}" y="${yt.toFixed(0)}" width="${s.w}" height="${(yb - yt + 20).toFixed(0)}"`;
       shadows += `<g transform="translate(${(x0 + 3.5 + k * 0.5).toFixed(1)} 0) rotate(${ang})">${r}/></g>`;
       strings += `<g transform="translate(${x0.toFixed(2)} 0) rotate(${ang})">${r} fill="url(#${s.g})"/>${r} fill="url(#winding)" opacity="${name === 'A' ? 0.5 : 1}"/></g>`;
-      openLabels += `<text x="${slotX(k, 15).toFixed(1)}" y="15">${name}</text>`;
+      openLabels += `<text x="${slotX(k, labY).toFixed(1)}" y="${labY.toFixed(1)}">${name}</text>`;
       for (let n = 1; n <= 6; n++) {
         const y = posY(n), x = slotX(k, y);
         ticks += `<rect x="${(x - 10).toFixed(1)}" y="${(y - 1).toFixed(1)}" width="20" height="2" rx="1"/>`;
@@ -330,22 +337,20 @@
         <filter id="soft" x="-50%" y="-5%" width="200%" height="110%"><feGaussianBlur stdDeviation="1.6"/></filter>
         <filter id="glow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="5"/></filter>
         <clipPath id="boardClip"><polygon points="${poly}"/></clipPath>
-        <clipPath id="viewClip"><rect x="${VB_X}" y="0" width="${VB_W}" height="${vbH.toFixed(1)}"/></clipPath>
+        <clipPath id="viewClip"><rect x="${VB_X}" y="${vbY.toFixed(1)}" width="${VB_W}" height="${vbH.toFixed(1)}"/></clipPath>
       </defs>
       <g aria-hidden="true" clip-path="url(#viewClip)">
         <polygon points="${poly}" fill="url(#ebony)"/>
-        <rect x="0" y="0" width="390" height="${yb.toFixed(0)}" filter="url(#grain)" opacity=".22" clip-path="url(#boardClip)"/>
-        <line x1="${edgeL(24) + 1}" y1="24" x2="${(edgeL(yb) + 1).toFixed(1)}" y2="${yb.toFixed(0)}" stroke="#5a4a3e" stroke-opacity=".55" stroke-width="1.2"/>
-        <line x1="${edgeR(24) - 1}" y1="24" x2="${(edgeR(yb) - 1).toFixed(1)}" y2="${yb.toFixed(0)}" stroke="#000" stroke-opacity=".7" stroke-width="1.5"/>
-        <rect x="56" y="22" width="278" height="14" rx="2.5" fill="url(#nutGrad)"/>
-        <rect x="57" y="22.5" width="276" height="1.5" rx=".75" fill="#8a7564" fill-opacity=".6"/>
+        <rect x="0" y="${yt.toFixed(0)}" width="390" height="${(yb - yt).toFixed(0)}" filter="url(#grain)" opacity=".22" clip-path="url(#boardClip)"/>
+        <line x1="${(edgeL(yt) + 1).toFixed(1)}" y1="${yt.toFixed(0)}" x2="${(edgeL(yb) + 1).toFixed(1)}" y2="${yb.toFixed(0)}" stroke="#5a4a3e" stroke-opacity=".55" stroke-width="1.2"/>
+        <line x1="${(edgeR(yt) - 1).toFixed(1)}" y1="${yt.toFixed(0)}" x2="${(edgeR(yb) - 1).toFixed(1)}" y2="${yb.toFixed(0)}" stroke="#000" stroke-opacity=".7" stroke-width="1.5"/>
         <g fill="#fbf3e9" fill-opacity=".38">${ticks}</g>
         <rect id="hl" x="0" y="0" width="24" height="3.6" rx="1.8" fill="#fbf3e9" fill-opacity=".85" visibility="hidden"/>
         <g opacity=".55" filter="url(#soft)" fill="#000">${shadows}</g>
         ${strings}
-        <rect x="0" y="${(vbH - 90).toFixed(1)}" width="390" height="91" fill="url(#fadeOut)"/>
+        <rect x="0" y="${(vbY + vbH - 90).toFixed(1)}" width="390" height="91" fill="url(#fadeOut)"/>
       </g>
-      <g ${font} font-weight="700" font-size="14" text-anchor="middle" style="fill:var(--board-top)" aria-hidden="true">${openLabels}</g>
+      <g ${font} font-weight="700" font-size="14" text-anchor="middle" fill="#efe6da" aria-hidden="true">${openLabels}</g>
       <g ${font} font-weight="500" font-size="11" fill="#cfc3b5" aria-hidden="true">${labels}</g>
       <g id="dot" visibility="hidden" aria-hidden="true">
         <circle id="dotGlow" r="15" opacity=".55" filter="url(#glow)" style="fill:var(--sig)"/>

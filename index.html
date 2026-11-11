@@ -275,12 +275,12 @@
   const STRINGS = { A: { midi: 57, w: 2.2, g: 'strA' }, D: { midi: 50, w: 2.8, g: 'strD' }, G: { midi: 43, w: 3.6, g: 'strG' }, C: { midi: 36, w: 4.6, g: 'strC' } };
   const NUT = 36, BOTTOM = 470, BASE = 1350;
   let SCALE = BASE;   // board units per string length; stretched so the six semitones fill the screen
-  // Strings and board taper slightly towards the bottom of the screen (the player's view).
-  const SLOT_TOP = [117, 169, 221, 273], SLOT_BOT = [126, 172, 218, 264];
+  // Strings and board narrow towards the top of the screen, as on a real cello neck.
+  const SLOT_TOP = [135, 175, 215, 255], SLOT_BOT = [108, 166, 224, 282];
   const VB_X = 44, VB_W = 302;
   let vbY = 0, vbH = 462, labY = 15;
   const taper = y => (y - NUT) * BASE / SCALE;   // keeps the taper the same however far the board is stretched
-  const edgeL = y => 84 + 12 * taper(y) / 446, edgeR = y => 306 - 12 * taper(y) / 446;
+  const edgeL = y => 100 - 20 * taper(y) / 446, edgeR = y => 290 + 20 * taper(y) / 446;
   // The board runs behind the readout, so the nut is hidden and the first semitone sits just below it.
   function fitBoard() {
     const r = $('board').getBoundingClientRect();

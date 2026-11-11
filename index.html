@@ -280,7 +280,7 @@
   const VB_X = 44, VB_W = 302;
   let vbY = 0, vbH = 462, labY = 15;
   const taper = y => (y - NUT) * BASE / SCALE;   // keeps the taper the same however far the board is stretched
-  const edgeL = y => 100 - 20 * taper(y) / 446, edgeR = y => 290 + 20 * taper(y) / 446;
+  const edgeL = y => 115 - 35 * taper(y) / 446, edgeR = y => 275 + 35 * taper(y) / 446;
   // The board runs behind the readout, so the nut is hidden and the first semitone sits just below it.
   function fitBoard() {
     const r = $('board').getBoundingClientRect();

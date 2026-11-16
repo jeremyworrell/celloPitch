@@ -37,10 +37,22 @@
     height: 100dvh; display: flex; flex-direction: column;
     position: relative; padding: 0;
     --sig: var(--muted);
+    background: var(--bg); color: var(--fg); transition: background-color 120ms linear;
   }
   #app[data-state="green"] { --sig: var(--green); }
   #app[data-state="amber"] { --sig: var(--amber); }
   #app[data-state="red"]   { --sig: var(--red); }
+  /* High-visibility: while a note sounds, the accuracy colour fills the background, whatever wallpaper is chosen. */
+  #app.hivis[data-state="green"] { --bg: #2fbf68; }
+  #app.hivis[data-state="amber"] { --bg: #f4a62a; }
+  #app.hivis[data-state="red"]   { --bg: #e8453c; }
+  #app.hivis:not([data-state="idle"]) {
+    --fg: #111; --muted: rgba(17,17,17,.72); --sig: #111;
+    --track: rgba(0,0,0,.18); --centre: rgba(0,0,0,.45);
+    --btn-bg: rgba(255,255,255,.4); --btn-border: rgba(0,0,0,.25);
+  }
+  #app.hivis #tick circle, #app.hivis #tick path { stroke: #111; }
+  #app.hivis #dotCore, #app.hivis #dotGlow { fill: var(--bg) !important; }
 
   .readout { position: relative; z-index: 1; padding: calc(env(safe-area-inset-top) + 14px) 20px 30px; display: flex; flex-direction: column; gap: 6px; flex: none;
     background: linear-gradient(to bottom, var(--bg) 0%, var(--bg) 62%, color-mix(in srgb, var(--bg) 75%, transparent) 84%, transparent 100%); pointer-events: none; }
@@ -194,6 +206,11 @@
     </div>
 
     <div class="card row">
+      <label for="hivis" class="lab"><span class="title">High-visibility colours</span><span class="hint">While a note sounds, the whole background turns green, amber or red.</span></label>
+      <input id="hivis" type="checkbox">
+    </div>
+
+    <div class="card row">
       <label for="awake" class="lab"><span class="title">Keep screen awake</span><span class="hint">While listening. Needs iOS 18.4 or later on the home screen.</span></label>
       <input id="awake" type="checkbox">
     </div>
@@ -208,7 +225,7 @@
   const MIN_HZ = 55, MAX_HZ = 1100, CLARITY_MIN = 0.85, HOLD_MS = 450;
 
   // ---------- Settings ----------
-  const DEFAULTS = { band: 10, ref: 440, sens: 50, theme: 'dark', mirror: true, awake: true, bgDark: '#0e0c0b', bgLight: '#f6f1ea' };
+  const DEFAULTS = { band: 10, ref: 440, sens: 50, theme: 'dark', mirror: true, awake: true, hivis: false, bgDark: '#0e0c0b', bgLight: '#f6f1ea' };
   const SWATCHES = {
     dark: [['#0e0c0b', 'Charcoal'], ['#000000', 'Black'], ['#0b1424', 'Navy'], ['#0b1a12', 'Forest'], ['#1a0f1c', 'Aubergine']],
     light: [['#f6f1ea', 'Ivory'], ['#ffffff', 'White'], ['#e7e3dc', 'Stone'], ['#e6eef7', 'Sky'], ['#e6efe4', 'Sage']]
@@ -254,6 +271,7 @@
     $('refOut').textContent = 'A4 = ' + S.ref + ' Hz';
     $('sens').value = S.sens;
     $('mirror').checked = S.mirror; $('awake').checked = S.awake;
+    $('hivis').checked = S.hivis; $('app').classList.toggle('hivis', S.hivis);
     document.querySelectorAll('input[name=theme]').forEach(r => { r.checked = r.value === S.theme; });
     $('zone').style.left = (50 - S.band) + '%'; $('zone').style.width = (2 * S.band) + '%';
     buildBoard();
@@ -264,6 +282,7 @@
   $('refDown').addEventListener('click', () => { S.ref = Math.max(415, S.ref - 1); save(); applySettings(); });
   $('refUp').addEventListener('click', () => { S.ref = Math.min(466, S.ref + 1); save(); applySettings(); });
   $('mirror').addEventListener('change', e => { S.mirror = e.target.checked; save(); applySettings(); });
+  $('hivis').addEventListener('change', e => { S.hivis = e.target.checked; save(); applySettings(); });
   $('awake').addEventListener('change', e => { S.awake = e.target.checked; save(); if (running) S.awake ? lockScreen() : unlockScreen(); });
   document.querySelectorAll('input[name=theme]').forEach(r => r.addEventListener('change', e => { S.theme = e.target.value; save(); applySettings(); }));
   const dlg = $('settings');
